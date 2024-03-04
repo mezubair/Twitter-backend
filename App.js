@@ -1,6 +1,7 @@
 const express = require ("express");
 const mongoose = require ("mongoose");
 const userRoutes = require("./routes/user.routes")
+const tweetRoutes = require("./routes/tweet.routes")
 
 const app = express();
 app.use(express.json());
@@ -21,6 +22,7 @@ mongoose.connect("mongodb://localhost:27017/Twitter",{
 })
 
 app.use("/user",userRoutes);
+app.use("/",tweetRoutes);
 
 
 app.listen(3001,()=>{
