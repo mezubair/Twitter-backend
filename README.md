@@ -24,9 +24,4 @@ This project is a backend application for a Twitter-like platform. It provides A
   
 - **JWT (JSON Web Tokens):** Standard for securely transmitting information between parties as a JSON object.
 
-## Installation
 
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/your-username/twitter-backend.git

@@ -1,6 +1,7 @@
 const nodemailer=require("nodemailer");
 
 const sendEmail=(options)=>{
+  return new Promise((resolve, reject) => {
    const transport = nodemailer.createTransport({
         host: "sandbox.smtp.mailtrap.io",
         port: 2525,
@@ -15,6 +16,14 @@ const sendEmail=(options)=>{
         subject:"Verify your Email",
         text:options.message
       }
-      transport.sendMail(emailOptions);
-}
+      transport.sendMail(emailOptions, (error, info) => {
+        if (error) {
+          reject(error); 
+        } else {
+          resolve(info); 
+        }
+      });
+    });
+  };
+  
 module.exports=sendEmail;
