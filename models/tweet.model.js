@@ -1,17 +1,13 @@
 const mongoose = require("mongoose");
 
-
-const commentsSchema = new mongoose.Schema({
-  comment: {
-    type: String,
-  },
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "User",
-  },
-});
-
 const likeSchema = new mongoose.Schema({
+  userId : {
+    type : mongoose.Schema.Types.ObjectId,
+    ref : "User"
+  }
+})
+
+const dislikeSchema = new mongoose.Schema({
   userId : {
     type : mongoose.Schema.Types.ObjectId,
     ref : "User"
@@ -29,9 +25,13 @@ const tweetSchema = new mongoose.Schema(
       type: String,
       required: [true, "Tweet can't be empty"],
     },
-    
+    comments : [{
+      type : mongoose.Schema.Types.ObjectId,
+      ref: "Comment"
+
+    }],
     likes :[likeSchema],
-    comments: [commentsSchema],
+    dislikes : [dislikeSchema],
   },
   { timestamps: true }
 );

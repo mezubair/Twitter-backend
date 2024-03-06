@@ -36,6 +36,12 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    accountMode : {
+      type : String,
+      enum : ["public" , "private"],
+      default : "public"
+    },
+
     resetToken: String,
     resetTokenExpTime: Date,
     passwordChangedAt: Date,
