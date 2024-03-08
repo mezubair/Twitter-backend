@@ -28,40 +28,54 @@ exports.postTweet = async (req, res) => {
 
 exports.getTweets = async (req, res) => {
   try {
-    const userIds = await Tweet.find().distinct("userId");
-    if (!userIds.length)return res.status(404).json({ message: "no tweets found check again later" });
+  
+    // const userIds = await Tweet.distinct("userId");
 
-    const publicAccounts = (await User.find({ _id: { $in: userIds } })).filter(
-      (i) => i.accountMode === "public"
-    );
-    if (!publicAccounts) return res.status(404).json({ message: "no tweets found check again later" });
-    const publicAccountIds = publicAccounts.map((i) => i._id);
+    // if (!userIds.length)
+    //   return res.status(404).json({ message: "No tweets found. Check again later." });
 
-    const publicTweets = await Tweet.find({ userId: publicAccountIds })
-    .populate({
-      path : "comments",
-      select :"comment"
-    });
-    return res.status(200).json({data : publicTweets});
+    // const publicAccounts = await User.find({ _id: { $in: userIds }, accountMode: "public" });
+    // const publicAccountIds = publicAccounts.map(i => i._id);
+    // console.log("🚀 ~ exports.getTweets= ~ publicAccountIds:", publicAccountIds)
+    
+
+    // const privateAccounts = await User.find({ _id: { $in: userIds }, accountMode: "private" });
+    // const privateAccountIds = privateAccounts
+    // .filter(account => account.followers.some(followedUser => followedUser.userId.toString() === req.user.userId))
+    // .map(account => account._id);
+
+
+  //   const tweets = await Tweet.find({
+  //     userId: {
+  //         $in: [...publicAccountIds, ...privateAccountIds]
+  //     }
+  // }).populate("comments");
+
+  const newTwets = await Tweet.find({userId : req.user.userId})
+
+    return res.status(200).json({ data: newTwets });
   } catch (error) {
     console.error(error);
-    res.status(500).json({error: "INTERNAL SERVER ERROR"});
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
+
+
 
 exports.getMyTweets = async (req, res) => {
   try {
-    const tweet = await Tweet.find({ userId: req.user.userId }).sort({ createdAt: -1 })
-    .populate({
-      path: "comments",
-      select: "comment userId"
-    });
-    if (!tweet) return res.status(200).json("no tweets found start by posting one");
-    return res.status(200).json({data : tweet, totallikes : tweet.likes.length});
+    const tweets = await Tweet.find({ userId: req.user.userId }).sort({ createdAt: -1 });
+    console.log(tweets);
+    if (tweets.length === 0) {
+      return res.status(200).json({message : "No tweets found. Start by posting one."});
+    }
+    return res.status(200).json({ data: tweets });
   } catch (error) {
-    res.status(500).json("INTERNAL SERVER ERROR");
+    console.error(error);
+    return res.status(500).json("Internal server error. Please try again later.");
   }
 };
+;
 
 exports.editTweet = async (req, res) => {
   try {
@@ -194,12 +208,9 @@ exports.deleteTweet = async (req, res) => {
     const tweetInfo = await Tweet.findOne({ _id: tweetId });
     if (!tweetInfo) return res.status(404).json("NO TWEET FOUND");
     if (tweetInfo.userId.toString() !== userId)
-      console.log("🚀 ~ exports.deleteTweet ~ userId:", userId)
-      console.log("🚀 ~ exports.deleteTweet ~ userId:", userId)
-      return res
-        .status(401)
-        .json("⚠ YOU ARE NOT AUTHORIZED TO DELETE THIS TWEET");
-
+    {
+      return res.status(401).json("⚠ YOU ARE NOT AUTHORIZED TO DELETE THIS TWEET");
+    }
     const deletedtweet = await Tweet.findOneAndDelete({ _id: tweetId });
     if (!deletedtweet) return res.status(500).json("ERROR DELETING TWEET");
     res.status(200).json("TWEET DELEETD");
@@ -207,3 +218,6 @@ exports.deleteTweet = async (req, res) => {
     res.status(500).json("INTERNAL SERVER ERROR");
   }
 };
+
+
+
