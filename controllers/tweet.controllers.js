@@ -29,31 +29,33 @@ exports.postTweet = async (req, res) => {
 exports.getTweets = async (req, res) => {
   try {
   
-    // const userIds = await Tweet.distinct("userId");
+    const userIds = await Tweet.distinct("userId");
 
-    // if (!userIds.length)
-    //   return res.status(404).json({ message: "No tweets found. Check again later." });
+    if (!userIds.length)
+      return res.status(404).json({ message: "No tweets found. Check again later." });
 
-    // const publicAccounts = await User.find({ _id: { $in: userIds }, accountMode: "public" });
-    // const publicAccountIds = publicAccounts.map(i => i._id);
-    // console.log("🚀 ~ exports.getTweets= ~ publicAccountIds:", publicAccountIds)
+    const publicAccounts = await User.find({ _id: { $in: userIds }, accountMode: "public" });
+    const publicAccountIds = publicAccounts.map(i => i._id);
+    console.log("🚀 ~ exports.getTweets= ~ publicAccountIds:", publicAccountIds)
     
 
-    // const privateAccounts = await User.find({ _id: { $in: userIds }, accountMode: "private" });
-    // const privateAccountIds = privateAccounts
-    // .filter(account => account.followers.some(followedUser => followedUser.userId.toString() === req.user.userId))
-    // .map(account => account._id);
+    const privateAccounts = await User.find({ _id: { $in: userIds }, accountMode: "private" });
+    const privateAccountIds = privateAccounts
+    .filter(account => account.followers.some(followedUser => followedUser.userId.toString() === req.user.userId))
+    .map(account => account._id);
 
 
-  //   const tweets = await Tweet.find({
-  //     userId: {
-  //         $in: [...publicAccountIds, ...privateAccountIds]
-  //     }
-  // }).populate("comments");
+    const tweets = await Tweet.find({
+    userId: {
+        $in: [...publicAccountIds, ...privateAccountIds]
+    }
+}).populate("comments");
 
-  const newTwets = await Tweet.find({userId : req.user.userId})
+console.log("🚀 ~ exports.getTweets= ~ tweets:", tweets);
 
-    return res.status(200).json({ data: newTwets });
+    
+
+    return res.status(200).json({ data: tweets });
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Internal server error" });
