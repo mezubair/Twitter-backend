@@ -6,6 +6,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const sendEmail = require("../utils/sendVerifcationEmail");
 const sendPasswordResetLink = require("../utils/SendResetPasswordLink");
+const sendFollowRequest = require("../utils/sendFollowReq");
 require("dotenv").config();
 
 exports.register = async (req, res) => {
@@ -179,21 +180,29 @@ exports.viewProfile = async (req, res) => {
   try {
     const userId = req.user.userId;
 
-    const user = await User.findOne({ _id: userId }).select([
-      "-_id",
-      "name",
-      "username",
-      "avatar",
-      "bio",
-      "email",
-    ]);
+    const user = await User.findOne({ _id: userId });
+
     if (!user)
-      return res
-        .status(404)
-        .json({ status: "fail", message: "user not found" });
-    return res.status(200).json(user);
+      return res.status(404).json({ status: "fail", message: "User not found" });
+
+    const followerCount = user.followers.length;
+    const followingCount = user.following.length;
+
+    return res.status(200).json({
+      user: {
+        name: user.name,
+        username: user.username,
+        avatar: user.avatar,
+        bio: user.bio,
+        email: user.email,
+        Followers: followerCount,
+      Following: followingCount
+      },
+      
+    });
   } catch (error) {
-    res.status(500).json("INTERNAL SERVER ERROR");
+    console.error(error);
+    return res.status(500).json({ status: "error", message: "Internal server error" });
   }
 };
 
@@ -283,3 +292,96 @@ exports.deleteAccount = async (req, res) => {
     res.status(500).json({ error: "An internal server error occurred" });
   }
 };
+
+exports.followUnfollow = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findOne({ _id: userId });
+    if (!user) {
+      return res.status(404).json({ status: "failed", message: "No user found or Invalid username" });
+    }
+
+    if (userId === req.user.userId) {
+      return res.status(401).json({ status: "failed", message: "You Can't Follow Yourself...." });
+    }
+
+
+    const currentUser = await User.findOne({_id : req.user.userId});
+
+
+    if ((user.followers.toString()).includes(req.user.userId)) {
+      user.followers = user.followers.filter(follower => follower.userId.toString() !== req.user.userId);
+      currentUser.following = currentUser.following.filter(f => f.userId.toString() !== userId);
+      await Promise.all([user.save(), currentUser.save()]);
+      return res.status(200).json({ status: "success", message: `You Un-followed ${user.username}` });
+    } 
+
+   else if (user.accountMode === "private"){
+    const url = `${req.protocol}://${req.get(
+      "host"
+    )}/user/accept-followReq?senderID=${req.user.userId}&&receiverID=${user._id}`;
+    await sendFollowRequest({
+      email : user.email,
+      message : `You have a new follow request from ${currentUser.username}. Click on the link below to accept the follow request:[${url}]`
+    })
+      return res.status(200).json({status : "sucess" , message : "Follow request sent"});
+    }
+    else{
+      currentUser.following.push({userId : user._id});
+      user.followers.push({ userId: req.user.userId });
+      await Promise.all([currentUser.save(), user.save()]);
+      return res.status(200).json({ status: "success", message: `You followed ${user.username}` });
+    }
+    
+
+  } catch (error) {
+    res.status(500).json({ status: "failed", message: error.message });
+  }
+}
+exports.acceptFollowReq = async (req , res)=>{
+ try {
+  const {senderID,receiverID} = req.query;
+  if(receiverID !== req.user.userId) return res.status(403).json({status : "fail" ,message :"Forbidden You Are Not Authorized"});
+  const sender = await User.findOne({_id : senderID});
+  if(!sender) return res.status(400).json({status : "failed",message :"inavlid Link"});
+  const currentUser = await User.findOne({_id : receiverID});
+  if(!currentUser) return res.status(400).json({status : "failed",message :"inavlid Link"});
+
+  if((sender.following.toString()).includes(req.user.userId)){
+    return res.status(200).json({ status: "success", message: `You already accepted the follow request of ${sender.username}` });
+  }
+
+  currentUser.followers.push({userId : sender._id});
+  sender.following.push({userId : currentUser._id});
+  await Promise.all([currentUser.save(),sender.save()]);
+  return res.status(200).json({ status: "success", message: `You accepted the follow request of ${sender.username} successfully` });
+
+  
+ } catch (error) {
+  res.status(500).json({ status: "failed", message: error.message });
+ } 
+};
+
+exports.changeAccountMode = async (req,res) => {
+  try {
+         const user = await User.findOne({_id : req.user.userId});
+         if(user.accountMode === "private" ){
+          user.accountMode = "public";
+         }
+         else {
+          user.accountMode = "private"
+         }
+
+         await user.save();
+
+         res.status(201).json({status : "sucess" , message : `Account mode changed to ${user.accountMode}`})
+         
+
+
+  } catch (error) {
+    res.status(500).json({status : "fail" , message :`Internal server error ${error.message}`})
+  }
+};
+
+

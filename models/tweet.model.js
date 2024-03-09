@@ -25,11 +25,10 @@ const tweetSchema = new mongoose.Schema(
       type: String,
       required: [true, "Tweet can't be empty"],
     },
-    comments : [{
-      type : mongoose.Schema.Types.ObjectId,
+    comment: [{
+      type: mongoose.Schema.Types.ObjectId,
       ref: "Comment"
-
-    }],
+  }]  ,
     likes :[likeSchema],
     dislikes : [dislikeSchema],
   },
