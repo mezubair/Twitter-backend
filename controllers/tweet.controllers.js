@@ -3,24 +3,20 @@ const User = require("../models/user.model");
 const Comment = require ("../models/comment.model");
 const CommentReply = require("../models/commentReply.model");
 
+
 exports.postTweet = async (req, res) => {
   try {
     const userId = req.user.userId;
-    console.log("🚀 ~ exports.postTweet= ~ userId:", userId)
-    console.log("🚀 ~ exports.postTweet= ~ userId:", userId)
     const { tweet } = req.body;
     const user = await User.findOne({ _id: userId });
-    console.log("🚀 ~ exports.postTweet= ~ userId:", userId)
-    if (!user.emailVerified)return res.status(403).json("‼ you cant post tweets ! Verify your email first");
+    if (!user.emailVerified)return res.status(403).json({message:"‼ You Can't Post Tweets ! Verify your email first"});
 
     const tweetCreated = await Tweet.create({
       userId: userId,
       tweet: tweet,
     });
-      console.log("🚀 ~ exports.postTweet= ~ userId:", userId)
-      console.log("🚀 ~ exports.postTweet= ~ userId:", userId)
     if (!tweetCreated) return res.status(401).json({message: "❌ SMOMETHING WENT WRONG"});
-    return res.status(200).json({ tweet });
+    return res.status(200).json({ tweetCreated });
   } catch (error) {
     res.status(500).json("INTERNAL SERVER ERROR");
   }
@@ -28,16 +24,13 @@ exports.postTweet = async (req, res) => {
 
 exports.getTweets = async (req, res) => {
   try {
-  
     const userIds = await Tweet.distinct("userId");
 
     if (!userIds.length)
       return res.status(404).json({ message: "No tweets found. Check again later." });
 
     const publicAccounts = await User.find({ _id: { $in: userIds }, accountMode: "public" });
-    const publicAccountIds = publicAccounts.map(i => i._id);
-    console.log("🚀 ~ exports.getTweets= ~ publicAccountIds:", publicAccountIds)
-    
+    const publicAccountIds = publicAccounts.map(i => i._id);    
 
     const privateAccounts = await User.find({ _id: { $in: userIds }, accountMode: "private" });
     const privateAccountIds = privateAccounts
@@ -45,24 +38,22 @@ exports.getTweets = async (req, res) => {
     .map(account => account._id);
 
 
-    const tweets = await Tweet.find({
-    userId: {
-        $in: [...publicAccountIds, ...privateAccountIds]
-    }
-}).populate("comments");
-
-console.log("🚀 ~ exports.getTweets= ~ tweets:", tweets);
-
-    
-
+    const tweets = await Tweet.find({userId: {$in: [...publicAccountIds, ...privateAccountIds]}})
+    .populate({
+                path: "comment",
+                select: "comment -_id",
+                populate: {
+                        path: "reply",
+                        select: "reply -_id"
+                         }
+              })
     return res.status(200).json({ data: tweets });
-  } catch (error) {
+  }
+   catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
-
-
 
 exports.getMyTweets = async (req, res) => {
   try {
@@ -77,7 +68,6 @@ exports.getMyTweets = async (req, res) => {
     return res.status(500).json("Internal server error. Please try again later.");
   }
 };
-;
 
 exports.editTweet = async (req, res) => {
   try {
@@ -105,24 +95,32 @@ exports.commentTweet = async (req, res) => {
    !tweetInfo && res.status(404).json({ message: "No tweets found with this id" });
 
    const tweet = await Comment.create({tweetId,userId,comment})
-   console.log("🚀 ~ exports.commentTweet= ~ tweet:", tweet)
+   tweetInfo.comment.push(tweet._id)
+   await tweetInfo.save();
     res.status(201).json({ message: "comment added", data: tweet });
   } catch (error) {}
 };
 
-exports.commentReply = async (req, res) =>{
+exports.commentReply = async (req, res) => {
   try {
-    const {commentId} = req.params;
-    const {reply} = req.body;
-    const isComment = await Comment.findOne({commentId});
-    !isComment && res.status(404).json({message : 'no comment found invalid comment id'});
-    const repycomment = await CommentReply.create({reply,userId: req.user.userId,commentId});
-    res.status(201).json({replycomment});
-
+    const { commentId } = req.params;
+    const { reply } = req.body;
+   
+    const isComment = await Comment.findById(commentId);
+ 
+    if (!isComment) return res.status(404).json({ message: 'No comment found with this id' });
+    
+    const newReply = await CommentReply.create({ reply, userId: req.user.userId, commentId });
+  
+    isComment.reply.push(newReply._id);
+    await isComment.save();
+    
+    res.status(201).json({ message: 'Reply added', data: newReply });
   } catch (error) {
-    res.status(500).json({error : "internal server error"})
+    console.error(error);
+    res.status(500).json({ error: 'Internal server error' });
   }
-}
+};
 
 exports.likeTweet = async (req, res) => {
   try {
@@ -153,7 +151,6 @@ exports.likeTweet = async (req, res) => {
   }
 };
 
-
 exports.dislikes = async (req, res) => {
   try {
     const { tweetId } = req.params;
@@ -164,18 +161,17 @@ exports.dislikes = async (req, res) => {
       return res.status(404).json({ message: "No tweet found" });
     }
 
-    const tweetLikes = tweetInfo.likes.map(i => i.userId);
+    const tweetLikes = tweetInfo.likes.map(i => i.userId.toString());
     if (tweetLikes.includes(userId)) {
       return res.status(200).json({ message: "You've already liked this tweet, can't dislike." });
     }
+
     const tweetDislikes = tweetInfo.dislikes.map(i => i.userId.toString());
-    console.log("🚀 ~ exports.dislikes= ~ tweetDislikes:", tweetDislikes)
-    
-    if (tweetDislikes.includes(req.user.userId)) {
+    if (tweetDislikes.includes(userId)) {
       return res.status(200).json({ message: "You've already disliked this tweet, can't dislike again." });
     }
 
-    tweetInfo.dislikes.push({ userId: req.user.userId });
+    tweetInfo.dislikes.push({ userId: userId });
     await tweetInfo.save();
     
     return res.status(200).json({ message: "You disliked this tweet" });
@@ -186,40 +182,26 @@ exports.dislikes = async (req, res) => {
   }
 };
 
-exports.commentReply =async (req,res)=>{
-  try {
-
-    const {commentId} = req.params;
-    const {userId} = req.user;
-    const {reply} = req.body;
-
-    const commentReply = await CommentReply.create({commentId,userId,reply});
-
-    res.status(201).json({message : " reply addded" , data : commentReply});
-  } catch (error) {
-   res.status(500).json({error : "Internal Server Error "})    
-  }
-}
-
 exports.deleteTweet = async (req, res) => {
   try {
     const { userId } = req.user;
-    console.log("🚀 ~ exports.deleteTweet ~ userId:", userId)
     const { tweetId } = req.params;
 
     const tweetInfo = await Tweet.findOne({ _id: tweetId });
-    if (!tweetInfo) return res.status(404).json("NO TWEET FOUND");
-    if (tweetInfo.userId.toString() !== userId)
-    {
-      return res.status(401).json("⚠ YOU ARE NOT AUTHORIZED TO DELETE THIS TWEET");
+    if (!tweetInfo) return res.status(404).json({ message: "No tweet found" });
+    if (tweetInfo.userId.toString() !== userId) {
+      return res.status(403).json({ message: "⚠ You are not authorized to delete this tweet" });
     }
-    const deletedtweet = await Tweet.findOneAndDelete({ _id: tweetId });
-    if (!deletedtweet) return res.status(500).json("ERROR DELETING TWEET");
-    res.status(200).json("TWEET DELEETD");
+    await Promise.all([
+      Tweet.findOneAndDelete({ _id: tweetId }),
+      Comment.deleteMany({ tweetId: tweetId }),
+      CommentReply.deleteMany({ commentId: { $in: tweetInfo.comment } })
+    ]);
+
+    return res.status(200).json({ message: "Tweet and associated comments deleted successfully" });
   } catch (error) {
-    res.status(500).json("INTERNAL SERVER ERROR");
+    console.error(error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 };
-
-
 

@@ -13,10 +13,10 @@ const commentSchema = new mongoose.Schema({
     comment: {
       type: String,
     },
-    reply : {
+    reply :[{
       type : mongoose.Schema.Types.ObjectId,
       ref : "CommentReply"
-    },
+    }],
   },{timestamps : true,versionKey : false});
   
 
